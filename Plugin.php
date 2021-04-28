@@ -4,7 +4,7 @@
  * gogobody 美化 适配 joe主题
  * @package LoveKKCommentModify
  * @author  gogobody
- * @version 1.1.1
+ * @version 1.1.5
  * @link    https://www.ijkxs.com
  */
 
@@ -402,12 +402,18 @@ class LoveKKCommentModify_Plugin implements Typecho_Plugin_Interface
      */
     static public function doComment($comment)
     {
+        if (is_array($comment)){
+            $coid = $comment['coid'];
+        }else{
+            $coid = $comment->coid;
+        }
         // 检测当前版本是否大于1.1/17.10.30
         if ( version_compare(str_replace('/', '.', Typecho_Common::VERSION), '1.1.17.10.30') ) {
             // 调用异步回调模式
-            Helper::requestService('sendMail', $comment->coid);
+
+            Helper::requestService('sendMail', $coid);
         } else {
-            self::sendMail($comment->coid);
+            self::sendMail($coid);
         }
     }
     
@@ -427,11 +433,13 @@ class LoveKKCommentModify_Plugin implements Typecho_Plugin_Interface
      */
     static public function doApproved($comment, $edit, $status)
     {
+
         // 仅审核通过才发送邮件
         if ( 'approved' == $status ) {
             // 检测当前版本是否大于1.1/17.10.30
             if ( version_compare(str_replace('/', '.', Typecho_Common::VERSION), '1.1.17.10.30') ) {
                 // 调用异步回调模式
+
                 Helper::requestService('asyncApproved', $comment);
             } else {
                 self::sendMail($comment->coid ? $comment->coid : $comment['coid'], TRUE);
@@ -453,8 +461,13 @@ class LoveKKCommentModify_Plugin implements Typecho_Plugin_Interface
      */
     static public function asyncApproved($comment)
     {
+        if (is_array($comment)){
+            $coid = $comment['coid'];
+        }else{
+            $coid = $comment->coid;
+        }
         // 调用异步邮件发送
-        self::sendMail($comment->coid, TRUE);
+        self::sendMail($coid, TRUE);
     }
     
     /**
@@ -480,15 +493,18 @@ class LoveKKCommentModify_Plugin implements Typecho_Plugin_Interface
         // 上级评论对象
         $parentComment = NULL;
         // 不是帖子发表者
-        if ( $comment->authorId != $comment->ownerId ) {
+        if ( !$isApproved and $comment->authorId != $comment->ownerId ) {
             // 获取作者信息
             $author = self::getWidget('Users', 'uid', $comment->ownerId);
-            // 收件地址
-            $address = $author->mail;
-            // 上级评论
+//             收件地址
+            if ($author and $author->mail)
+                $address = $author->mail;
+            else
+                $address = $comment->mail;
+//             上级评论
             $parentComment = NULL;
         }
-        
+
         // 评论回复
         if ( 0 < $comment->parent ) {
             // 获取上级对象
